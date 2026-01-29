@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKOOLMATE - admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- FIREBASE SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+    <style>
+        :root { --bg-color: #f0f2f5; --primary: #2c3e50; --accent: #4a90e2; --danger: #e74c3c; --success: #2ecc71; --text-main: #333; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); margin: 0; padding-bottom: 60px; user-select: none; }
+        
+        /* LOGIN */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { width: 85%; max-width: 350px; text-align: center; }
+        .login-icon { font-size: 60px; color: var(--primary); margin-bottom: 20px; }
+
+        /* HEADER */
+        .header { background: #fff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; }
+        .h-title { font-weight: 800; font-size: 20px; color: var(--primary); }
+
+        /* GRID */
+        .admin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 20px; }
+        .admin-card { background: #fff; border-radius: 18px; padding: 20px 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.03); display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.1s; }
+        .admin-card:active { transform: scale(0.96); }
+        .icon-box { width: 50px; height: 50px; border-radius: 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; }
+        .card-name { font-size: 12px; font-weight: 700; color: #444; }
+
+        /* SCREENS */
+        .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f9; z-index: 1500; transform: translateX(100%); transition: transform 0.3s; overflow-y: auto; }
+        .screen.active { transform: translateX(0); }
+        .fs-header { background: #fff; padding: 15px; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .fs-title { font-size: 18px; font-weight: bold; margin-left: 15px; flex: 1; }
+
+        /* FORM */
+        .form-section { background: white; padding: 20px; margin: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        .form-group { margin-bottom: 15px; }
+        .label { font-size: 12px; font-weight: bold; color: #666; display: block; margin-bottom: 5px; }
+        .input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; outline: none; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        .btn-primary { background: var(--accent); color: white; }
+        
+        .manage-item { background: white; padding: 12px; margin: 10px 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); border-left: 4px solid var(--accent); }
+        .history-list { max-height: 400px; overflow-y: auto; }
+        .flex-row { display: flex; gap: 10px; } .flex-col { flex: 1; }
+        .preview-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <div class="login-box">
+            <i class="fa-solid fa-user-shield login-icon"></i>
+            <h2 style="color:var(--primary); margin:0;">Admin Access</h2>
+            <br>
+            <input type="email" id="login_email" class="input" placeholder="Admin Email" style="margin-bottom:10px;">
+            <input type="password" id="login_pass" class="input" placeholder="Password" style="margin-bottom:10px;">
+            <button class="btn btn-primary" onclick="handleLogin()">Secure Login</button>
+            <p id="login_msg" style="color:red; font-size:12px; margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="main-app" style="display: none;">
+        <div class="header">
+            <div><div class="h-title">Admin Panel</div><div style="font-size:11px; color:var(--accent);">Full Access</div></div>
+            <i class="fa-solid fa-right-from-bracket" style="color: var(--danger); font-size: 20px; cursor: pointer;" onclick="logout()"></i>
+        </div>
+
+        <div class="admin-grid">
+            <div class="admin-card" onclick="openScreen('studentScreen')"><div class="icon-box" style="background: #4facfe;"><i class="fa-solid fa-user-graduate"></i></div><div class="card-name">Students</div></div>
+            <div class="admin-card" onclick="openScreen('academicScreen')"><div class="icon-box" style="background: #43e97b;"><i class="fa-solid fa-book-open"></i></div><div class="card-name">Homework</div></div>
+            <div class="admin-card" onclick="openScreen('feeScreen')"><div class="icon-box" style="background: #ff9a9e;"><i class="fa-solid fa-indian-rupee-sign"></i></div><div class="card-name">Fees</div></div>
+            <div class="admin-card" onclick="openScreen('resultScreen')"><div class="icon-box" style="background: #667eea;"><i class="fa-solid fa-square-poll-vertical"></i></div><div class="card-name">Results</div></div>
+            <div class="admin-card" onclick="openScreen('libraryScreen')"><div class="icon-box" style="background: #fa709a;"><i class="fa-solid fa-book"></i></div><div class="card-name">Library</div></div>
+            <div class="admin-card" onclick="openScreen('transportScreen')"><div class="icon-box" style="background: #fda085;"><i class="fa-solid fa-bus"></i></div><div class="card-name">Transport</div></div>
+            <div class="admin-card" onclick="openScreen('attendanceScreen')"><div class="icon-box" style="background: #ff758c;"><i class="fa-solid fa-calendar-check"></i></div><div class="card-name">Attendance</div></div>
+            <div class="admin-card" onclick="openScreen('timetableScreen')"><div class="icon-box" style="background: #30cfd0;"><i class="fa-solid fa-table-list"></i></div><div class="card-name">Timetable</div></div>
+            <div class="admin-card" onclick="openScreen('uploadScreen')"><div class="icon-box" style="background: #a18cd1;"><i class="fa-solid fa-cloud-arrow-up"></i></div><div class="card-name">Docs</div></div>
+            <div class="admin-card" onclick="openScreen('commScreen')"><div class="icon-box" style="background: #f6d365;"><i class="fa-solid fa-bullhorn"></i></div><div class="card-name">News</div></div>
+            <div class="admin-card" onclick="openScreen('miscScreen')"><div class="icon-box" style="background: #868f96;"><i class="fa-solid fa-users-gear"></i></div><div class="card-name">Staff</div></div>
+            <div class="admin-card" onclick="openScreen('requestScreen')"><div class="icon-box" style="background: #8fd3f4;"><i class="fa-solid fa-bell"></i></div><div class="card-name">Requests</div></div>
+        </div>
+
+        <!-- 1. STUDENT MANAGER -->
+        <div id="studentScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('studentScreen')" style="padding:10px;"></i><span class="fs-title">Students</span><i class="fa-solid fa-plus" style="margin-left:auto; color:var(--accent); font-size:20px;" onclick="openAddStudentForm()"></i></div>
+            
+            <div id="addStForm" class="form-section" style="display:none; background:#f0f9ff; border:1px solid var(--accent); max-height:85vh; overflow-y:auto;">
+                <h4 id="stFormTitle">Add Student</h4>
+                <input type="hidden" id="st_id_hidden"><input type="hidden" id="st_pic_url">
+                <div style="text-align:center; margin-bottom:15px;">
+                    <img id="st_preview" src="https://via.placeholder.com/100" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:3px solid white;">
+                    <br><label for="st_file" style="color:blue; font-size:12px; cursor:pointer;">Change Photo</label>
+                    <input type="file" id="st_file" style="display:none" accept="image/*" onchange="previewImage(this, 'st_preview')">
+                    <p id="st_loading" style="display:none; color:orange; font-size:10px;">Uploading...</p>
+                </div>
+                <div class="form-group"><label class="label">Full Name</label><input class="input" id="st_name"></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Class</label><select class="input" id="st_class_drop"><option>Nursery</option><option>LKG</option><option>UKG</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select></div><div class="flex-col"><label class="label">Section</label><input class="input" id="st_sec_in" placeholder="A"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Roll No</label><input class="input" id="st_roll"></div><div class="flex-col"><label class="label">Adm No</label><input class="input" id="st_adm"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">House</label><input class="input" id="st_house"></div><div class="flex-col"><label class="label">Route ID</label><input class="input" id="st_route" placeholder="R1"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">DOB</label><input type="date" class="input" id="st_dob"></div><div class="flex-col"><label class="label">Adm Date</label><input type="date" class="input" id="st_adm_date"></div></div>
+                <div class="form-group"><label class="label">Father Name</label><input class="input" id="st_father"></div>
+                <div class="form-group"><label class="label">Mother Name</label><input class="input" id="st_mother"></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">F-Mobile</label><input type="number" class="input" id="st_f_mob"></div><div class="flex-col"><label class="label">M-Mobile</label><input type="number" class="input" id="st_m_mob"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">F-Occ</label><input class="input" id="st_f_occ"></div><div class="flex-col"><label class="label">M-Occ</label><input class="input" id="st_m_occ"></div></div>
+                <div class="form-group"><label class="label">Address</label><textarea class="input" id="st_addr" rows="2"></textarea></div>
+                <div class="form-group"><label class="label">Sibling?</label><select id="st_sib_has" class="input" onchange="toggleSibling(this.value)"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                <div id="sib_box" style="display:none; margin-bottom:10px;"><label class="label">Details</label><input type="text" class="input" id="st_sib_det"></div>
+                <div class="form-group"><label class="label">Student Mobile</label><input type="number" class="input" id="st_mobile"></div>
+                <div class="form-group"><label class="label">Email (Login)</label><input type="email" class="input" id="st_email"></div>
+                <button class="btn btn-primary" onclick="saveStudent()">Save Student</button>
+                <button class="btn" style="background:#eee; color:#333; margin-top:5px;" onclick="document.getElementById('addStForm').style.display='none'">Cancel</button>
+            </div>
+            <div class="search-bar"><input type="text" class="input" placeholder="Search..." oninput="renderStudentList(this.value)"></div>
+            <div id="studentListContainer" style="padding-bottom:20px;"></div>
+        </div>
+
+        <!-- 2. HOMEWORK -->
+        <div id="academicScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('academicScreen')" style="padding:10px;"></i><span class="fs-title">Homework</span></div>
+            <div class="form-section">
+                <div class="form-group"><label class="label">Type</label><select class="input" id="acad_type"><option>Homework</option><option>Holiday HW</option></select></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Class</label><select class="input" id="acad_class"><option>All</option><option>Nursery</option><option>LKG</option><option>UKG</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select></div><div class="flex-col"><label class="label">Section</label><input class="input" id="acad_sec" placeholder="Opt"></div></div>
+                <div class="form-group"><label class="label">Date</label><input type="date" id="acad_date" class="input"></div>
+                <div class="form-group"><label class="label">Subject</label><input type="text" class="input" id="acad_title"></div>
+                <div class="form-group"><label class="label">Content</label><textarea class="input" rows="3" id="acad_desc"></textarea></div>
+                <div class="form-group"><label class="label">Image</label><input type="file" id="acad_file" class="input" accept="image/*"><p id="acad_loading" style="display:none; color:blue;">Uploading...</p></div>
+                <button class="btn btn-primary" onclick="postAcademic()">Post</button>
+            </div>
+            <div class="form-section"><h4>History</h4><div id="academicHistory" class="history-list"></div></div>
+        </div>
+
+        <!-- 3. ATTENDANCE (Yellow Leave) -->
+        <div id="attendanceScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('attendanceScreen')" style="padding:10px;"></i><span class="fs-title">Attendance</span></div>
+            <div style="padding:15px; background:white;">
+                <div class="flex-row"><div class="flex-col"><label class="label">Class</label><select class="input" id="att_class_drop"><option>Nursery</option><option>LKG</option><option>UKG</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select></div><div class="flex-col"><label class="label">Section</label><input type="text" class="input" id="att_sec_in" placeholder="A"></div></div>
+                <button class="btn" style="background:#eee; color:#333;" onclick="loadClassAttendance()">Load Students</button>
+            </div>
+            <div id="attListContainer"></div>
+            <div style="padding:15px;"><button class="btn btn-primary" onclick="submitAttendance()">Submit</button></div>
+        </div>
+
+        <!-- 4. TIMETABLE -->
+        <div id="timetableScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('timetableScreen')" style="padding:10px;"></i><span class="fs-title">Timetable</span></div>
+            <div class="form-section">
+                <div class="flex-row"><div class="flex-col"><label class="label">Class</label><select id="tt_class" class="input"><option>Nursery</option><option>LKG</option><option>UKG</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select></div><div class="flex-col"><label class="label">Section</label><input type="text" id="tt_sec" class="input" placeholder="A"></div></div>
+                <div class="form-group"><label class="label">Day</label><select id="tt_day" class="input"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
+                <button class="btn" style="background:#666; color:white; margin-bottom:15px;" onclick="loadTimetable()">Load Data</button>
+                <input type="text" id="p0" class="input" placeholder="P0" style="margin-bottom:5px;">
+                <input type="text" id="p1" class="input" placeholder="P1" style="margin-bottom:5px;">
+                <input type="text" id="p2" class="input" placeholder="P2" style="margin-bottom:5px;">
+                <input type="text" id="p3" class="input" placeholder="P3" style="margin-bottom:5px;">
+                <input type="text" id="p4" class="input" placeholder="P4" value="Lunch" style="margin-bottom:5px;">
+                <input type="text" id="p5" class="input" placeholder="P5" style="margin-bottom:5px;">
+                <input type="text" id="p6" class="input" placeholder="P6" style="margin-bottom:5px;">
+                <input type="text" id="p7" class="input" placeholder="P7" style="margin-bottom:5px;">
+                <input type="text" id="p8" class="input" placeholder="P8" style="margin-bottom:5px;">
+                <button class="btn btn-primary" onclick="saveTimetable()">Save</button>
+            </div>
+        </div>
+
+        <!-- 5. FEE MANAGER -->
+        <div id="feeScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('feeScreen')" style="padding:10px;"></i><span class="fs-title">Fee Manager</span></div>
+            <div class="form-section">
+                <div class="form-group"><label class="label">Student Email</label><input id="fee_email" class="input" placeholder="Search by Email"></div>
+                <div class="form-group"><label class="label">Title</label><input id="fee_title" class="input" placeholder="e.g. Tuition Fee"></div>
+                <div class="flex-row"><input id="fee_amt" class="input" placeholder="Amount"><select id="fee_status" class="input"><option>Pending</option><option>Paid</option></select></div>
+                <div class="form-group"><label class="label">Due Date</label><input type="date" id="fee_date" class="input"></div>
+                <button class="btn btn-primary" onclick="addFee()">Add Fee Record</button>
+            </div>
+            <div class="form-section"><h4>History</h4><div id="feeList" class="history-list"></div></div>
+        </div>
+
+        <!-- 6. RESULT MANAGER -->
+        <div id="resultScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('resultScreen')" style="padding:10px;"></i><span class="fs-title">Results</span></div>
+            <div class="form-section">
+                <div class="form-group"><label class="label">Student Email</label><input id="res_email" class="input"></div>
+                <div class="form-group"><label class="label">Exam Name</label><input id="res_exam" class="input"></div>
+                <div class="form-group"><label class="label">Subjects (CSV)</label><input id="res_subs" class="input" placeholder="Math, Eng, Sci"></div>
+                <div class="form-group"><label class="label">Marks (CSV)</label><input id="res_marks" class="input" placeholder="90, 85, 88"></div>
+                <button class="btn btn-primary" onclick="uploadResult()">Publish</button>
+            </div>
+            <div class="form-section"><h4>History</h4><div id="resultList" class="history-list"></div></div>
+        </div>
+
+        <!-- 7. LIBRARY -->
+        <div id="libraryScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('libraryScreen')" style="padding:10px;"></i><span class="fs-title">Library</span></div>
+            <div class="form-section">
+                <div class="form-group"><label class="label">Student Email</label><input id="lib_email" class="input"></div>
+                <div class="form-group"><label class="label">Book Name</label><input id="lib_book" class="input"></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Issue</label><input type="date" id="lib_issue_date" class="input"></div><div class="flex-col"><label class="label">Due</label><input type="date" id="lib_date" class="input"></div></div>
+                <button class="btn btn-primary" onclick="issueBook()">Issue Book</button>
+            </div>
+            <div class="form-section"><h4>History</h4><div id="libraryList" class="history-list"></div></div>
+        </div>
+
+        <!-- 8. TRANSPORT -->
+        <div id="transportScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('transportScreen')" style="padding:10px;"></i><span class="fs-title">Transport</span></div>
+            <div class="form-section">
+                <label class="label">Route ID</label><input id="tr_route" class="input">
+                <label class="label">Bus No</label><input id="tr_bus" class="input">
+                <label class="label">Driver</label><input id="tr_driver" class="input">
+                <label class="label">Phone</label><input id="tr_phone" class="input">
+                <button class="btn btn-primary" onclick="addTransport()">Save</button>
+            </div>
+            <div class="form-section"><h4>Routes</h4><div id="transportList" class="history-list"></div></div>
+        </div>
+
+        <!-- 9. STAFF & GALLERY (Full Details) -->
+        <div id="miscScreen" class="screen">
+            <div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('miscScreen')" style="padding:10px;"></i><span class="fs-title">Staff Management</span></div>
+            <div class="form-section">
+                <h4 style="margin-top:0;">Add Staff</h4>
+                
+                <label class="label">Photo</label><input type="file" id="stf_file" class="input" accept="image/*"><p id="stf_loading" style="display:none; color:blue; font-size:11px;">Uploading...</p>
+                <div class="flex-row"><div class="flex-col"><label class="label">Name</label><input id="stf_name" class="input"></div><div class="flex-col"><label class="label">Role</label><input id="stf_sub" class="input" placeholder="Subject"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Mobile</label><input type="number" id="stf_mob" class="input"></div><div class="flex-col"><label class="label">Email</label><input type="email" id="stf_email" class="input"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">DOB</label><input type="date" id="stf_dob" class="input"></div><div class="flex-col"><label class="label">Join Date</label><input type="date" id="stf_join" class="input"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Guardian</label><select id="stf_co_rel" class="input"><option>Father</option><option>Husband</option></select></div><div class="flex-col"><label class="label">G. Name</label><input id="stf_co_name" class="input"></div></div>
+                <div class="flex-row"><div class="flex-col"><label class="label">Qualif</label><input id="stf_qual" class="input"></div><div class="flex-col"><label class="label">Aadhaar</label><input type="number" id="stf_aadhaar" class="input"></div></div>
+                <label class="label">Address</label><textarea id="stf_addr" class="input" rows="2"></textarea>
+
+                <button class="btn btn-primary" onclick="addStaff()">Add Staff</button>
+                <div id="staffList" class="history-list" style="margin-top:10px; height:250px;"></div>
+            </div>
+            <div class="form-section"><h4>Gallery</h4><input type="file" id="gal_file" class="input"><button class="btn btn-primary" onclick="addGallery()">Upload</button><p id="gal_loading" style="display:none;color:blue">Wait...</p></div>
+            <div class="form-section"><h4>Slider</h4><input type="text" id="slide_url" class="input" placeholder="Image URL"><button class="btn btn-primary" onclick="addSlide()">Add</button></div>
+        </div>
+
+        <!-- 10. DOCS, NEWS, REQUESTS -->
+        <div id="uploadScreen" class="screen"><div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('uploadScreen')" style="padding:10px;"></i><span class="fs-title">Docs Upload</span></div><div class="form-section"><select id="doc_type" class="input"><option value="syllabus">Syllabus</option><option value="datesheet">Datesheet</option><option value="elearning">E-Learning</option><option value="material">Material</option></select><select id="doc_class" class="input" style="margin-top:10px;"><option value="All">All Classes</option><option>Nursery</option><option>LKG</option><option>UKG</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option><option>IX</option><option>X</option><option>XI</option><option>XII</option></select><input id="doc_title" class="input" style="margin-top:10px;" placeholder="Title"><input type="file" id="doc_file" class="input" accept=".pdf,.doc,.jpg"><p id="doc_loading" style="display:none;color:blue">Uploading...</p><button class="btn btn-primary" style="margin-top:10px;" onclick="uploadDoc()">Upload</button></div></div>
+        <div id="commScreen" class="screen"><div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('commScreen')" style="padding:10px;"></i><span class="fs-title">News</span></div><div class="form-section"><select id="news_type" class="input" onchange="loadNewsHistory()"><option value="notices">News</option><option value="circulars">Circular</option><option value="events">Event</option><option value="thoughts">Thought</option></select><input id="news_head" class="input" placeholder="Title" style="margin-top:10px;"><input id="news_date" class="input" placeholder="Date" style="margin-top:10px;"><textarea id="news_det" class="input" rows="2" style="margin-top:10px;"></textarea><button class="btn btn-primary" onclick="postNews()">Publish</button></div><div class="form-section"><h4>History</h4><div id="newsHistory" class="history-list"></div></div></div>
+        <div id="requestScreen" class="screen"><div class="fs-header"><i class="fa-solid fa-arrow-left" onclick="closeScreen('requestScreen')" style="padding:10px;"></i><span class="fs-title">Requests</span></div><div class="form-section"><div id="pendingRequests"></div></div><div class="form-section"><h4>7 Days History</h4><div id="historyRequests" style="color:#777; font-size:12px;"></div></div></div>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBAUi1RVGdA9x6oo8XQ2zSyoR8gn1eCc4c", 
+            authDomain: "coin-earn-app.firebaseapp.com",
+            projectId: "coin-earn-app",
+            storageBucket: "coin-earn-app.firebasestorage.app",
+            messagingSenderId: "583026903249",
+            appId: "1:583026903249:web:bb3653e1d159b2ce021df0"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const storage = firebase.storage();
+
+        let studentsList = [];
+
+        // 1. AUTH
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-app').style.display = 'block';
+                loadStudents(); loadStaffList(); 
+                cleanOldRequests(); // Auto clean
+            } else {
+                document.getElementById('login-screen').style.display = 'flex';
+                document.getElementById('main-app').style.display = 'none';
+            }
+        });
+
+        function handleLogin() {
+            const e = document.getElementById('login_email').value;
+            const p = document.getElementById('login_pass').value;
+            if(!e || !p) return;
+            auth.signInWithEmailAndPassword(e, p).catch(err => alert(err.message));
+        }
+
+        window.logout = function() { auth.signOut(); location.reload(); }
+        
+        window.openScreen = function(id) { 
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'feeScreen') loadFeeHistory();
+            if(id === 'resultScreen') loadResultHistory();
+            if(id === 'libraryScreen') loadLibraryHistory();
+            if(id === 'transportScreen') loadTransportHistory();
+            if(id === 'academicScreen') loadAcademicHistory();
+            if(id === 'commScreen') loadNewsHistory();
+            if(id === 'requestScreen') loadRequests();
+        }
+        window.closeScreen = function(id) { document.getElementById(id).classList.remove('active'); }
+
+        // 2. HELPER: UPLOAD
+        async function uploadImageToStorage(file, folder) {
+            const ref = storage.ref(folder + '/' + Date.now() + '-' + file.name);
+            await ref.put(file);
+            return await ref.getDownloadURL();
+        }
+        window.previewImage = function(input, imgId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) { document.getElementById(imgId).src = e.target.result; }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        window.toggleSibling = function(val) { const b=document.getElementById('sib_box'); if(b) b.style.display=(val==='Yes'?'block':'none'); }
+
+        // 3. SIBLING POPUP LOGIC
+        async function getExactStudent(emailInput) {
+            const cleanEmail = emailInput.trim().toLowerCase();
+            const matches = studentsList.filter(s => s.email.trim().toLowerCase() === cleanEmail);
+            if (matches.length === 0) { alert("No student found!"); return null; }
+            if (matches.length === 1) { return matches[0]; }
+            let msg = "Multiple students found:\n\n";
+            matches.forEach((s, index) => { msg += `${index + 1}. ${s.name} (Class: ${s.class}-${s.section})\n`; });
+            msg += "\nEnter 1 or 2:";
+            const choice = prompt(msg);
+            if (!choice) return null;
+            const selectedIndex = parseInt(choice) - 1;
+            if (matches[selectedIndex]) { return matches[selectedIndex]; } else { alert("Invalid."); return null; }
+        }
+
+        // 4. STUDENT MANAGER
+        function loadStudents() {
+            db.collection("students").onSnapshot(snap => {
+                studentsList = [];
+                let html = '';
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    studentsList.push({id: doc.id, ...s});
+                    html += `<div class="manage-item" onclick="editStudent('${doc.id}')"><div class="item-content"><img src="${s.pic || 'https://via.placeholder.com/40'}" class="preview-img"><div><b>${s.name}</b><br><small>${s.class}-${s.section}</small></div></div><i class="fa-solid fa-trash" style="color:red" onclick="event.stopPropagation(); deleteStudent('${doc.id}')"></i></div>`;
+                });
+                document.getElementById('studentListContainer').innerHTML = html;
+            });
+        }
+        
+        window.saveStudent = async function() {
+            try {
+                const nameEl = document.getElementById('st_name');
+                const emailEl = document.getElementById('st_email');
+                if(!nameEl.value || !emailEl.value) { alert("Name & Email required"); return; }
+
+                const file = document.getElementById('st_file').files[0];
+                let pic = document.getElementById('st_pic_url').value;
+                if(file) { document.getElementById('st_loading').style.display='block'; pic = await uploadImageToStorage(file, 'students'); document.getElementById('st_loading').style.display='none'; }
+
+                const getValue = (id) => document.getElementById(id) ? document.getElementById(id).value : "";
+                
+                const data = {
+                    name: getValue('st_name'), class: getValue('st_class_drop'), section: getValue('st_sec_in'), roll: getValue('st_roll'), admNo: getValue('st_adm'), house: getValue('st_house'), routeId: getValue('st_route'), dob: getValue('st_dob'), admDate: getValue('st_adm_date'), fatherName: getValue('st_father'), motherName: getValue('st_mother'), fatherMobile: getValue('st_f_mob'), motherMobile: getValue('st_m_mob'), fatherOcc: getValue('st_f_occ'), motherOcc: getValue('st_m_occ'), address: getValue('st_addr'), mobile1: getValue('st_mobile'), email: getValue('st_email').trim().toLowerCase(),
+                    sibling: document.getElementById('st_sib_has') ? (document.getElementById('st_sib_has').value === "Yes") : false,
+                    siblingDetails: getValue('st_sib_det'),
+                    pic: pic, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                const docId = document.getElementById('st_id_hidden').value;
+                const ref = docId ? db.collection("students").doc(docId) : db.collection("students").doc();
+                await ref.set(data, { merge: true });
+                alert("Saved!"); document.getElementById('addStForm').style.display='none';
+            } catch(e) { alert(e.message); }
+        }
+
+        window.openAddStudentForm = function() {
+            document.getElementById('addStForm').style.display='block';
+            document.getElementById('stFormTitle').innerText="Add Student";
+            document.getElementById('st_id_hidden').value="";
+            document.getElementById('st_pic_url').value="";
+            document.getElementById('st_preview').src="https://via.placeholder.com/100";
+            document.querySelectorAll('#addStForm input:not([type=hidden]), #addStForm textarea').forEach(i=>i.value="");
+        }
+
+        window.editStudent = function(id) {
+            const s = studentsList.find(x => x.id === id);
+            if(!s) return;
+            document.getElementById('addStForm').style.display='block';
+            document.getElementById('stFormTitle').innerText="Edit Student";
+            document.getElementById('st_id_hidden').value=id;
+            document.getElementById('st_pic_url').value=s.pic||"";
+            document.getElementById('st_preview').src=s.pic||"https://via.placeholder.com/100";
+            
+            const setVal = (did, v) => { if(document.getElementById(did)) document.getElementById(did).value = v || ""; }
+            setVal('st_name', s.name); setVal('st_email', s.email); setVal('st_class_drop', s.class); setVal('st_sec_in', s.section); setVal('st_roll', s.roll); setVal('st_adm', s.admNo); setVal('st_house', s.house); setVal('st_route', s.routeId); setVal('st_dob', s.dob); setVal('st_adm_date', s.admDate); setVal('st_father', s.fatherName); setVal('st_mother', s.motherName); setVal('st_f_mob', s.fatherMobile); setVal('st_m_mob', s.motherMobile); setVal('st_f_occ', s.fatherOcc); setVal('st_m_occ', s.motherOcc); setVal('st_addr', s.address); setVal('st_mobile', s.mobile1); setVal('st_sib_det', s.siblingDetails);
+            
+            if(document.getElementById('st_sib_has')) {
+                const has = s.sibling===true||s.sibling==="Yes"?"Yes":"No";
+                document.getElementById('st_sib_has').value=has;
+                toggleSibling(has);
+            }
+        }
+
+        window.deleteStudent = function(id) { if(confirm("Permanently delete?")) db.collection("students").doc(id).delete(); }
+
+        // 5. FEE (Smart)
+        window.addFee = async function() {
+            const email = document.getElementById('fee_email').value;
+            const student = await getExactStudent(email); 
+            if(!student) return;
+            db.collection("fees").add({ email: student.email, studentName: student.name, studentClass: `${student.class}-${student.section}`, title: document.getElementById('fee_title').value, amount: document.getElementById('fee_amt').value, status: document.getElementById('fee_status').value, dueDate: document.getElementById('fee_date').value, timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(() => { alert("Fee Added!"); loadFeeHistory(); });
+        }
+        function loadFeeHistory() {
+            const container = document.getElementById('feeList'); container.innerHTML = 'Loading...';
+            db.collection("fees").get().then(snap => {
+                let h = ''; snap.forEach(d => { const f = d.data(); h += `<div class="manage-item"><div><b>${f.studentName}</b><br><small>${f.title}: ${f.amount} (${f.status})</small></div><i class="fa-solid fa-trash" style="color:red" onclick="db.collection('fees').doc('${d.id}').delete().then(()=>loadFeeHistory())"></i></div>`; });
+                container.innerHTML = h || '<p style="text-align:center">Empty</p>';
+            });
+        }
+
+        // 6. RESULT (Smart)
+        window.uploadResult = async function() { 
+            const email = document.getElementById('res_email').value;
+            const student = await getExactStudent(email); if(!student) return;
+            const sArr=[]; const s=document.getElementById('res_subs').value.split(','); const m=document.getElementById('res_marks').value.split(','); s.forEach((x,i)=>sArr.push({sub:x.trim(), marks:m[i]||0})); 
+            db.collection("results").add({ email: student.email, studentName: student.name, studentClass: `${student.class}-${student.section}`, examName: document.getElementById('res_exam').value, subjects: sArr, timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(() => alert("Published!")); 
+        }
+        function loadResultHistory() {
+            db.collection("results").limit(20).get().then(snap => {
+                let h=''; snap.forEach(d => { const r = d.data(); h += `<div class="manage-item"><div><b>${r.studentName}</b><br><small>${r.examName}</small></div><i class="fa-solid fa-trash" style="color:red" onclick="db.collection('results').doc('${d.id}').delete()"></i></div>`; });
+                document.getElementById('resultList').innerHTML = h;
+            });
+        }
+        
+        // 7. LIBRARY (Smart + Return)
+        window.issueBook = async function() { 
+            const email = document.getElementById('lib_email').value;
+            const student = await getExactStudent(email); if(!student) return;
+            db.collection("library_books").add({ issuedTo: student.email, studentName: student.name, studentClass: `${student.class}-${student.section}`, bookName: document.getElementById('lib_book').value, issueDate: document.getElementById('lib_issue_date').value, dueDate: document.getElementById('lib_date').value, status: 'Issued', timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(() => { alert("Issued!"); loadLibraryHistory(); }); 
+        }
+        function loadLibraryHistory() {
+            const container = document.getElementById('libraryList'); container.innerHTML = 'Loading...';
+            db.collection("library_books").get().then(snap => {
+                let h = '';
+                snap.forEach(doc => { const b = doc.data(); const btn = b.status === 'Issued' ? `<button class="btn" style="width:auto; padding:5px; background:green; color:white" onclick="returnBook('${doc.id}')">Return</button>` : `<span style="color:green">Returned</span>`; h += `<div class="manage-item"><div><b>${b.studentName}</b><br><small>${b.bookName}</small></div><div>${btn}</div></div>`; });
+                container.innerHTML = h || '<p style="text-align:center">Empty</p>';
+            });
+        }
+        window.returnBook = function(id) { db.collection("library_books").doc(id).update({ status: 'Returned' }).then(()=>loadLibraryHistory()); }
+        
+        // 8. STAFF (Full Details + Photo)
+        window.addStaff = async function() { 
+            const file = document.getElementById('stf_file').files[0];
+            if(!document.getElementById('stf_name').value) return alert("Name required");
+            let picUrl = ""; if(file) { document.getElementById('stf_loading').style.display='block'; picUrl = await uploadImageToStorage(file, 'staff'); document.getElementById('stf_loading').style.display='none'; }
+            
+            const data = { name: document.getElementById('stf_name').value, subject: document.getElementById('stf_sub').value, mobile: document.getElementById('stf_mob').value, email: document.getElementById('stf_email').value, dob: document.getElementById('stf_dob').value, joiningDate: document.getElementById('stf_join')?document.getElementById('stf_join').value:'', qualification: document.getElementById('stf_qual')?document.getElementById('stf_qual').value:'', address: document.getElementById('stf_addr').value, careOfRelation: document.getElementById('stf_co_rel').value, careOfName: document.getElementById('stf_co_name').value, aadhaar: document.getElementById('stf_aadhaar').value, pic: picUrl };
+            db.collection("staff").add(data).then(()=>alert("Added")); 
+        }
+        function loadStaffList() { 
+            db.collection("staff").onSnapshot(snap=>{ let h=''; snap.forEach(d=>{ const s=d.data(); const info=`NAME: ${s.name}\nSUBJECT: ${s.subject}\nMOBILE: ${s.mobile}\nEMAIL: ${s.email}\nDOB: ${s.dob}\nQUALIF: ${s.qualification}\nJOIN: ${s.joiningDate}\nGUARDIAN: ${s.careOfName} (${s.careOfRelation})\nAADHAAR: ${s.aadhaar}\nADDRESS: ${s.address}`; h+=`<div class="manage-item" onclick="alert(\`${info}\`)"><div style="display:flex;align-items:center;"><img src="${s.pic||'https://via.placeholder.com/40'}" class="preview-img" style="border-radius:50%;margin-right:10px;"><div><b>${s.name}</b><br><small>${s.subject}</small></div></div><i class="fa-solid fa-trash" style="color:red" onclick="event.stopPropagation(); db.collection('staff').doc('${d.id}').delete()"></i></div>`; }); document.getElementById('staffList').innerHTML=h; }); 
+        }
+
+        // 9. TRANSPORT
+        window.addTransport = function() { db.collection("transport").add({routeId: document.getElementById('tr_route').value, busNo: document.getElementById('tr_bus').value, driverName: document.getElementById('tr_driver').value, driverPhone: document.getElementById('tr_phone').value}).then(() => alert("Saved!")); }
+        function loadTransportHistory() {
+            db.collection("transport").get().then(snap => { let h=''; snap.forEach(d=>{ const t=d.data(); h+=`<div class="manage-item"><div><b>${t.routeId}</b><br><small>${t.busNo}</small></div><i class="fa-solid fa-trash" style="color:red" onclick="db.collection('transport').doc('${d.id}').delete().then(()=>loadTransportHistory())"></i></div>`; }); document.getElementById('transportList').innerHTML = h; });
+        }
+
+        // 10. TIMETABLE
+        function saveTimetable() {
+            const id = `${document.getElementById('tt_class').value}_${document.getElementById('tt_sec').value}_${document.getElementById('tt_day').value}`;
+            let periods = []; for(let i=0; i<=15; i++) { const el=document.getElementById('p'+i); if(el) periods.push(el.value||'-'); }
+            db.collection("timetables").doc(id).set({ class: document.getElementById('tt_class').value, section: document.getElementById('tt_sec').value, day: document.getElementById('tt_day').value, periods: periods }).then(()=>alert("Saved!"));
+        }
+        function loadTimetable() {
+            const id = `${document.getElementById('tt_class').value}_${document.getElementById('tt_sec').value}_${document.getElementById('tt_day').value}`;
+            for(let i=0;i<=15;i++) { const el=document.getElementById('p'+i); if(el) el.value=""; }
+            db.collection("timetables").doc(id).get().then(doc => { if(doc.exists) { const p=doc.data().periods; p.forEach((val,idx)=>{ if(document.getElementById('p'+idx)) document.getElementById('p'+idx).value=val; }); alert("Loaded!"); } else { alert("No data"); } });
+        }
+
+        // 11. ACADEMIC & DOCS
+        window.postAcademic = function() { 
+            const file = document.getElementById('acad_file').files[0];
+            const saveHW = (url) => { db.collection("academics").add({ type: document.getElementById('acad_type').value, class: document.getElementById('acad_class').value, section: document.getElementById('acad_sec').value, title: document.getElementById('acad_title').value, desc: document.getElementById('acad_desc').value, date: document.getElementById('acad_date').value, image: url || "", timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(()=>alert("Posted")); };
+            if(file) { document.getElementById('acad_loading').style.display='block'; uploadImageToStorage(file, 'homework').then(url => { document.getElementById('acad_loading').style.display='none'; saveHW(url); }); } else { saveHW(""); }
+        }
+        function loadAcademicHistory() { db.collection("academics").orderBy('timestamp', 'desc').limit(20).get().then(snap=>{ let h=''; snap.forEach(d=>{ const v=d.data(); h+=`<div class="manage-item"><div><b>${v.title}</b><br><small>${v.class}</small></div><i class="fa-solid fa-trash" style="color:red" onclick="db.collection('academics').doc('${d.id}').delete()"></i></div>`; }); document.getElementById('academicHistory').innerHTML=h; }); }
+
+        window.uploadDoc = async function() { 
+            const file = document.getElementById('doc_file').files[0]; if(!file) return alert("Select File");
+            document.getElementById('doc_loading').style.display='block';
+            const url = await uploadImageToStorage(file, 'documents');
+            db.collection("documents").add({ type: document.getElementById('doc_type').value, class: document.getElementById('doc_class').value, title: document.getElementById('doc_title').value, url: url, timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(()=>alert("Uploaded")); 
+            document.getElementById('doc_loading').style.display='none';
+        }
+
+        // 12. NEWS & REQUESTS (7 Days + Yellow Leave)
+        window.postNews = function() { db.collection(document.getElementById('news_type').value).add({ title: document.getElementById('news_head').value, details: document.getElementById('news_det').value, date: document.getElementById('news_date').value, timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(()=>{ alert("Published"); loadNewsHistory(); }); }
+        function loadNewsHistory() { const t=document.getElementById('news_type').value; db.collection(t).orderBy('timestamp','desc').limit(10).get().then(s=>{let h='';s.forEach(d=>{h+=`<div class="manage-item">${d.data().title}<i class="fa-solid fa-trash" onclick="db.collection('${t}').doc('${d.id}').delete().then(()=>loadNewsHistory())"></i></div>`});document.getElementById('newsHistory').innerHTML=h}); }
+
+        function cleanOldRequests() { const cut = new Date(); cut.setDate(cut.getDate()-7); db.collection("requests").where('timestamp','<',cut).get().then(s=>{s.forEach(d=>d.ref.delete())}); }
+        function loadRequests() { 
+            db.collection("requests").orderBy('timestamp','desc').get().then(s=>{ 
+                let p=''; let h=''; 
+                s.forEach(d=>{ 
+                    const r=d.data(); 
+                    const item = `<div class="manage-item" onclick="alert('${r.detail}')"><b>${r.name}</b> (${r.type}) <br> <small>${r.status}</small></div>`;
+                    if(r.status==='Pending') {
+                        p += `<div class="manage-item"><b>${r.name}</b> (${r.type}) <br> <small>${r.detail}</small> <div><i class="fa-solid fa-check" style="color:green" onclick="db.collection('requests').doc('${d.id}').update({status:'Approved'}).then(()=>loadRequests())"></i> <i class="fa-solid fa-xmark" style="color:red; margin-left:10px;" onclick="db.collection('requests').doc('${d.id}').update({status:'Rejected'}).then(()=>loadRequests())"></i></div></div>`;
+                    } else { h += item; }
+                }); 
+                document.getElementById('pendingRequests').innerHTML=p||"No Pending"; 
+                document.getElementById('historyRequests').innerHTML=h||"No History";
+            }); 
+        }
+
+        // ATTENDANCE (Yellow Leave)
+        window.loadClassAttendance = function() {
+            const cls = document.getElementById('att_class_drop').value;
+            const sec = document.getElementById('att_sec_in').value;
+            const filtered = studentsList.filter(s => s.class === cls && s.section === sec);
+            let html = '';
+            filtered.forEach(s => { html += `<div class="manage-item" data-id="${s.id}" data-name="${s.name}"><div class="item-title">${s.name}</div><button class="btn att-btn" style="width:40px;background:#ddd;" onclick="toggleAtt(this)">P</button></div>`; });
+            document.getElementById('attListContainer').innerHTML = html || '<p style="text-align:center">No students.</p>';
+        }
+        window.toggleAtt = function(btn) {
+            if(btn.innerText==='P') { btn.innerText='A'; btn.style.background='var(--danger)'; btn.style.color='white'; }
+            else if(btn.innerText==='A') { btn.innerText='L'; btn.style.background='var(--warning)'; btn.style.color='black'; }
+            else if(btn.innerText==='L') { btn.innerText='LV'; btn.style.background='#f1c40f'; btn.style.color='black'; } // Yellow Leave
+            else { btn.innerText='P'; btn.style.background='#ddd'; btn.style.color='black'; }
+        }
+        window.submitAttendance = function() { const items = document.querySelectorAll('#attListContainer .manage-item'); let records = []; items.forEach(d => records.push({ name: d.getAttribute('data-name'), status: d.querySelector('.att-btn').innerText })); db.collection("attendance").add({ date: new Date().toISOString().split('T')[0], class: document.getElementById('att_class_drop').value, section: document.getElementById('att_sec_in').value, records: records }).then(() => alert("Saved!")); }
+
+        window.addGallery = async function() { const file = document.getElementById('gal_file').files[0]; if(file) { document.getElementById('gal_loading').style.display='block'; const url = await uploadImageToStorage(file, 'gallery'); db.collection("gallery").add({url:url}).then(()=>{ alert("Uploaded!"); document.getElementById('gal_loading').style.display='none'; }); } }
+        window.addSlide = function() { db.collection("sliders").add({ url: document.getElementById('slide_url').value, timestamp: firebase.firestore.FieldValue.serverTimestamp() }).then(()=>alert("Added")); }
+
+    </script>
+</body>
+</html>
