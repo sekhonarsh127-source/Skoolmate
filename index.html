@@ -343,7 +343,47 @@
                 document.getElementById('studentListContainer').innerHTML = html;
             });
         }
-        
+        // --- SEARCH FUNCTION (FIXED) ---
+window.renderStudentList = function(query) {
+    const container = document.getElementById('studentListContainer');
+    if (!container) return;
+
+    // Search query ko chhota (lowercase) karein taaki spelling match ho sake
+    const cleanQuery = query.toLowerCase().trim();
+
+    // Students list ko filter karein
+    const filtered = studentsList.filter(s => {
+        const name = (s.name || "").toLowerCase();
+        const roll = (s.roll || "").toLowerCase();
+        const adm = (s.admNo || "").toLowerCase(); // Admission No. se bhi search karega
+
+        // Check karein ki naam, roll no ya admission no mein query hai ya nahi
+        return name.includes(cleanQuery) || roll.includes(cleanQuery) || adm.includes(cleanQuery);
+    });
+
+    // Result Show karein
+    let html = '';
+    if (filtered.length === 0) {
+        html = '<p style="text-align:center; color:#999; margin-top:20px;">No student found.</p>';
+    } else {
+        filtered.forEach(s => {
+            // Wahi same design jo loadStudents mein use kiya tha
+            html += `<div class="manage-item" onclick="editStudent('${s.id}')">
+                <div class="item-content">
+                    <img src="${s.pic || 'https://via.placeholder.com/40'}" class="preview-img">
+                    <div>
+                        <b>${s.name}</b><br>
+                        <small>${s.class}-${s.section} | R:${s.roll}</small>
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <i class="fa-solid fa-trash" style="color:red" onclick="event.stopPropagation(); deleteStudent('${s.id}')"></i>
+                </div>
+            </div>`;
+        });
+    }
+    container.innerHTML = html;
+        }
         window.saveStudent = async function() {
             try {
                 const nameEl = document.getElementById('st_name');
